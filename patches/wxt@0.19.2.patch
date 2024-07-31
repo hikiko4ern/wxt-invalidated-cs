@@ -1,0 +1,53 @@
+diff --git a/dist/client/content-scripts/content-script-context.mjs b/dist/client/content-scripts/content-script-context.mjs
+index bc40727a8dd605790f0835203856974517f4083c..572aae416bb19a89ed1b517ad559f4ffcb920c5f 100644
+--- a/dist/client/content-scripts/content-script-context.mjs
++++ b/dist/client/content-scripts/content-script-context.mjs
+@@ -4,6 +4,7 @@ import { getUniqueEventName } from "./custom-events.mjs";
+ import { createLocationWatcher } from "./location-watcher.mjs";
+ export class ContentScriptContext {
+   constructor(contentScriptName, options) {
++    this.uuid = crypto.randomUUID();
+     this.contentScriptName = contentScriptName;
+     this.options = options;
+     this.#abortController = new AbortController();
+@@ -11,6 +12,7 @@ export class ContentScriptContext {
+       this.#stopOldScripts();
+     }
+     this.setTimeout(() => {
++      logger.debug('will attach newer scripts listener', this.uuid);
+       this.#listenForNewerScripts();
+     });
+   }
+@@ -149,10 +151,12 @@ export class ContentScriptContext {
+     );
+   }
+   #stopOldScripts() {
++    logger.debug('stopping old scripts', this.uuid);
+     window.postMessage(
+       {
+         type: ContentScriptContext.SCRIPT_STARTED_MESSAGE_TYPE,
+-        contentScriptName: this.contentScriptName
++        contentScriptName: this.contentScriptName,
++        uuid: this.uuid
+       },
+       "*"
+     );
+@@ -160,6 +164,7 @@ export class ContentScriptContext {
+   #listenForNewerScripts() {
+     const cb = (event) => {
+       if (event.data?.type === ContentScriptContext.SCRIPT_STARTED_MESSAGE_TYPE && event.data?.contentScriptName === this.contentScriptName) {
++        logger.warn('invalidated from', event.data.uuid);
+         this.notifyInvalidated();
+       }
+     };
+diff --git a/dist/sandbox/utils/logger.mjs b/dist/sandbox/utils/logger.mjs
+index 3a491ed016e6b0e2333c04aa62433479389139f1..112f18c3a98847ce66f83e52f96c3b29d8b9e170 100644
+--- a/dist/sandbox/utils/logger.mjs
++++ b/dist/sandbox/utils/logger.mjs
+@@ -1,5 +1,5 @@
+ function print(method, ...args) {
+-  if (import.meta.env.MODE === "production") return;
++  // if (import.meta.env.MODE === "production") return;
+   if (typeof args[0] === "string") {
+     const message = args.shift();
+     method(`[wxt] ${message}`, ...args);
